@@ -38,10 +38,10 @@ docker compose up --build airflow-init
 docker compose up -d
 ```
 
-- Airflow: http://localhost:8080, `airflow` / `airflow`
-- MinIO: http://localhost:9001, `minioadmin` / `minioadmin`
-- Mongo Express: http://localhost:8081, `admin` / `admin`
-- PostgreSQL: localhost:5433, пользователь `ods`, пароль `ods`
+- Airflow: http://localhost:8080, логин `airflow`, пароль `airflow`. Если список пустой, обнови страницу. Прямые ссылки: `/dags/ods_raw_to_minio/grid`, `/dags/ods_tenders_to_mongo/grid`, `/dags/ods_geo_prices_to_postgres/grid`
+- Файлы MinIO: http://localhost:9002. В этой версии MinIO нет своей консоли на порту 9001, порт 9000 — это API, не страница.
+- Карточки MongoDB: http://localhost:8081, логин `admin`, пароль `admin`, база `ods`, коллекция `tenders`
+- Таблицы PostgreSQL: http://localhost:8082. Система PostgreSQL, сервер `postgres-ods`, пользователь `ods`, пароль `ods`, база `ods`. Адрес http://localhost:5433 в браузере не откроется: это порт базы, не сайт.
 
 Процессы сначала стоят на паузе. Её нужно снять и нажать Trigger.
 
@@ -49,15 +49,15 @@ docker compose up -d
 
 Один и тот же набор тендеров записали во все три хранилища и замерили время записи, время поиска по id и объём. Скрипт: `scripts/benchmark_stores.py`. Цифры и картинки: `benchmark_results.md`, папка `figures/`.
 
-Прогон 2 октября 2026, 19 тендеров. Сайт в этот момент не открылся, поэтому взяли уже сохранённый файл `output/matches.jsonl`.
+Прогон 2 октября 2026, 20:43. Взяты файлы последнего ручного запуска Airflow: 37 карточек, сырые XML и HTML.
 
 | Хранилище | Запись, мс | Поиск по id, мс | Объём |
 |---|---:|---:|---:|
-| MinIO | 292 | 2.5 | 16.9 КиБ, 2 файла |
-| MongoDB | 31 | 1.4 | 14.4 КиБ, 19 документов |
-| PostgreSQL | 18 | 1.0 | 128 КиБ, 19 строк |
+| MinIO | 248 | 1.8 | 1.3 МБ, 2 файла |
+| MongoDB | 30 | 1.4 | 35 КиБ, в коллекции 56 документов |
+| PostgreSQL | 12 | 0.8 | 224 КиБ, в таблицах 76 строк |
 
-128 КиБ у PostgreSQL — это размер таблиц вместе с пустыми страницами, а не размер самих строк. Поиск везде быстрее 2 мс. В MinIO запись дольше, потому что каждый файл уходит отдельным запросом.
+В MongoDB и PostgreSQL строк больше, чем 37: там остались и предыдущие запуски. Поиск везде быстрее 2 мс. Запись в MinIO дольше, потому что туда уходит вся страница целиком, около 1.3 МБ. В базы попадает уже разобранный текст, он намного меньше.
 
 | | MinIO | MongoDB | PostgreSQL |
 |---|---|---|---|

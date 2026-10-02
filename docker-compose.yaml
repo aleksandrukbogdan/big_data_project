@@ -113,6 +113,14 @@ services:
       start_period: 20s
     restart: always
 
+  adminer:
+    image: adminer:4
+    ports:
+      - "8082:8080"
+    depends_on:
+      - postgres-ods
+    restart: always
+
   mongo-express:
     image: mongo-express:1.0.2
     environment:
@@ -146,6 +154,19 @@ services:
       timeout: 5s
       retries: 8
       start_period: 20s
+    restart: always
+
+  s3manager:
+    image: cloudlena/s3manager:latest
+    ports:
+      - "9002:8080"
+    environment:
+      ENDPOINT: minio:9000
+      ACCESS_KEY_ID: minioadmin
+      SECRET_ACCESS_KEY: minioadmin
+      USE_SSL: "false"
+    depends_on:
+      - minio
     restart: always
 
   airflow-webserver:

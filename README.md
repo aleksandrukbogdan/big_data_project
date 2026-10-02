@@ -25,10 +25,10 @@ docker compose up --build airflow-init
 docker compose up -d
 ```
 
-- Airflow: http://localhost:8080 — `airflow` / `airflow`
-- MinIO: http://localhost:9001 — `minioadmin` / `minioadmin`
-- Mongo Express: http://localhost:8081 — `admin` / `admin`
-- PostgreSQL: `localhost:5433`, база и пользователь `ods`, пароль `ods`
+- Airflow: http://localhost:8080 — `airflow` / `airflow`. Если список пустой, обнови страницу.
+- Файлы MinIO: http://localhost:9002. Порт 9001 в этой сборке не открывается, 9000 — это API.
+- Карточки: http://localhost:8081 — `admin` / `admin`
+- Таблицы: http://localhost:8082, сервер `postgres-ods`, пользователь `ods`, пароль `ods`, база `ods`. В браузере `localhost:5433` не откроется.
 
 В Airflow три процесса, сначала они на паузе:
 

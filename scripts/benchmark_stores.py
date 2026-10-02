@@ -82,8 +82,29 @@ def raw_from_tenders(tenders: list[Tender]) -> dict[str, str]:
     return {"rss.xml": rss, "category.html": html}
 
 
-def load_batch(config_path: Path | None, *, snapshot_only: bool = False) -> tuple[dict[str, str], list[Tender], float, str]:
+def load_from_minio() -> tuple[dict[str, str], list[Tender], float, str]:
+    loader = MinioLoader()
+    names = loader.list_prefix("raw/")
+
+    def pick(suffix: str) -> str:
+        matches = [name for name in names if name.endswith(suffix) and "/run_id=benchmark/" not in name]
+        if not matches:
+            matches = [name for name in names if name.endswith(suffix)]
+        if not matches:
+            raise RuntimeError(f"В MinIO нет файла {suffix}")
+        manual = [name for name in matches if "manual__" in name]
+        chosen = sorted(manual or matches)[-1]
+        return loader.get_text(chosen)
+
+    payloads = {"rss.xml": pick("rss.xml"), "category.html": pick("category.html")}
+    tenders = parse_tenders_from_raw(payloads)
+    return payloads, tenders, 0.0, "последний успешный запуск Airflow, файлы уже лежат в MinIO"
+
+
+def load_batch(config_path: Path | None, *, snapshot_only: bool = False, from_minio: bool = False) -> tuple[dict[str, str], list[Tender], float, str]:
     snapshot = ROOT / "output" / "matches.jsonl"
+    if from_minio:
+        return load_from_minio()
     if snapshot_only:
         tenders = tenders_from_jsonl(snapshot)
         return raw_from_tenders(tenders), tenders, 0.0, f"snapshot {snapshot.name}"
@@ -101,8 +122,12 @@ def load_batch(config_path: Path | None, *, snapshot_only: bool = False) -> tupl
         return raw_from_tenders(tenders), tenders, 0.0, f"snapshot {snapshot.name}: {exc}"
 
 
-def benchmark(config_path: Path | None = None, *, snapshot_only: bool = False) -> dict:
-    payloads, tenders, extract_ms, data_source = load_batch(config_path, snapshot_only=snapshot_only)
+def benchmark(config_path: Path | None = None, *, snapshot_only: bool = False, from_minio: bool = False) -> dict:
+    payloads, tenders, extract_ms, data_source = load_batch(
+        config_path,
+        snapshot_only=snapshot_only,
+        from_minio=from_minio,
+    )
     attrs = attributes_from_tenders(tenders)
     sample_id = tenders[0].id if tenders else None
 
@@ -231,9 +256,7 @@ def save_markdown(results: dict) -> Path:
     lines.extend(
         [
             "",
-            "128 КиБ у PostgreSQL — размер таблиц вместе с пустыми страницами, не размер самих строк. У MinIO и MongoDB цифра ближе к объёму данных.",
-            "",
-            "Если батч взят из snapshot, сайт в момент прогона не открылся. Процессы Airflow ходят на сайт сами. Файл `output/matches.jsonl` нужен, чтобы сравнить хранилища без сети.",
+            "Объём PostgreSQL включает пустые страницы таблиц. MinIO здесь — размер исходных XML и HTML. MongoDB — размер документов.",
             "",
             "## Графики",
             "",
@@ -257,9 +280,14 @@ def main() -> int:
         action="store_true",
         help="Skip live HTTP and use output/matches.jsonl",
     )
+    parser.add_argument(
+        "--from-minio",
+        action="store_true",
+        help="Measure the batch already stored by Airflow",
+    )
     args = parser.parse_args()
 
-    results = benchmark(args.config, snapshot_only=args.snapshot)
+    results = benchmark(args.config, snapshot_only=args.snapshot, from_minio=args.from_minio)
     RESULTS_JSON.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     save_charts(results)
     save_markdown(results)

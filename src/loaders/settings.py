@@ -44,4 +44,4 @@ def mongo_settings() -> MongoSettings:
 
 
 def postgres_dsn() -> str:
-    return env("POSTGRES_ODS_DSN", "postgresql://ods:ods@localhost:5433/ods")
+    return env("POSTGRES_ODS_DSN", "postgresql://ods:ods@127.0.0.1:5433/ods")
