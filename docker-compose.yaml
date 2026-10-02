@@ -1,0 +1,207 @@
+# Airflow LocalExecutor + ODS storages (MinIO, MongoDB, PostgreSQL).
+# Derived from the official Airflow docker-compose guide:
+# https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html
+
+x-airflow-common: &airflow-common
+  build: .
+  image: tender-screening-airflow:2.10.5
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    PYTHONPATH: /opt/airflow
+    TENDER_CONFIG: /opt/airflow/config.yaml
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY: minioadmin
+    MINIO_SECRET_KEY: minioadmin
+    MINIO_BUCKET: ods-tenders
+    MINIO_SECURE: "false"
+    MONGO_URI: mongodb://ods:ods@mongo:27017/ods?authSource=admin
+    MONGO_DB: ods
+    MONGO_COLLECTION: tenders
+    POSTGRES_ODS_DSN: postgresql://ods:ods@postgres-ods:5432/ods
+    AIRFLOW_CONN_S3_ODS: aws://minioadmin:minioadmin@minio:9000
+    AIRFLOW_CONN_MONGO_ODS: mongodb://ods:ods@mongo:27017/ods?authSource=admin
+    AIRFLOW_CONN_POSTGRES_ODS: postgresql://ods:ods@postgres-ods:5432/ods
+  volumes:
+    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/src:/opt/airflow/src
+    - ${AIRFLOW_PROJ_DIR:-.}/config.yaml:/opt/airflow/config.yaml:ro
+    - ${AIRFLOW_PROJ_DIR:-.}/sql:/opt/airflow/sql:ro
+    - ${AIRFLOW_PROJ_DIR:-.}/scripts:/opt/airflow/scripts:ro
+    - ${AIRFLOW_PROJ_DIR:-.}/report:/opt/airflow/report
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+    postgres-ods:
+      condition: service_started
+    mongo:
+      condition: service_started
+    minio:
+      condition: service_started
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-airflow-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  postgres-ods:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ods
+      POSTGRES_PASSWORD: ods
+      POSTGRES_DB: ods
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-ods-data:/var/lib/postgresql/data
+      - ./sql/init_ods.sql:/docker-entrypoint-initdb.d/init_ods.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "ods"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ods
+      MONGO_INITDB_ROOT_PASSWORD: ods
+      MONGO_INITDB_DATABASE: ods
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-ods-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--username",
+          "ods",
+          "--password",
+          "ods",
+          "--authenticationDatabase",
+          "admin",
+          "--quiet",
+          "--eval",
+          "db.adminCommand('ping').ok",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 8
+      start_period: 20s
+    restart: always
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ods
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ods
+      ME_CONFIG_MONGODB_URL: mongodb://ods:ods@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongo
+    restart: always
+
+  minio:
+    # Official minio/minio and quay.io/minio/minio no longer allow anonymous pulls
+    # (removed from Docker Hub in Sep 2026, Quay returns 401). This tag is the
+    # same MinIO server, mirrored by Bitnami.
+    image: bitnamilegacy/minio:2025.7.23
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-ods-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    restart: always
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        chown -R "$${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _AIRFLOW_WWW_USER_EMAIL: admin@example.com
+    user: "0:0"
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}:/sources
+
+volumes:
+  postgres-airflow-data:
+  postgres-ods-data:
+  mongo-ods-data:
+  minio-ods-data:

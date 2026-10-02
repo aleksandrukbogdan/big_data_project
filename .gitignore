@@ -1,0 +1,11 @@
+data/
+output/*
+!output/matches.jsonl
+logs/*
+!logs/.gitkeep
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+report/benchmark_results.json

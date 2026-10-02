@@ -1,0 +1,15 @@
+rss_url: https://rostender.info/rss-category-1504.xml
+category_url: https://rostender.info/category/tendery-v-oblasti-it
+keywords:
+  - сайт
+  - вордпресс
+  - wordpress
+  - python
+  - django
+  - 1с
+  - лиценз
+  - разработ
+interval_minutes: 10
+storage_path: data/seen.db
+output_path: output/matches.jsonl
+use_category_fallback: true
