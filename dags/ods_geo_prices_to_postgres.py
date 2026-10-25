@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.datasets import Dataset
 from airflow.operators.python import PythonOperator
+
+ODS_IT_TENDERS = Dataset("postgres://postgres-ods:5432/ods/ods/tender_cards")
 
 from src.etl_tasks import extract_raw, load_geo_prices_to_postgres, transform_geo_prices
 
@@ -27,6 +30,8 @@ def _transform(**context) -> dict:
     return {
         "locations": len(payload["locations"]),
         "prices": len(payload["prices"]),
+        "cards": len(payload.get("cards") or []),
+        "industries": len(payload.get("industries") or []),
     }
 
 
@@ -37,7 +42,7 @@ def _load(**context) -> dict:
 
 with DAG(
     dag_id="ods_geo_prices_to_postgres",
-    description="ODS: места поставки и цены тендеров в PostgreSQL",
+    description="ODS: география, НМЦ и поля карточки IT-тендера в PostgreSQL",
     default_args=DEFAULT_ARGS,
     start_date=datetime(2026, 1, 1),
     schedule="@hourly",
@@ -47,5 +52,9 @@ with DAG(
 ) as dag:
     extract = PythonOperator(task_id="extract", python_callable=_extract)
     transform = PythonOperator(task_id="transform", python_callable=_transform)
-    load = PythonOperator(task_id="load", python_callable=_load)
+    load = PythonOperator(
+        task_id="load",
+        python_callable=_load,
+        outlets=[ODS_IT_TENDERS],
+    )
     extract >> transform >> load

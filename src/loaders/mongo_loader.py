@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from pymongo import MongoClient, ReplaceOne
+from pymongo import MongoClient, UpdateOne
 
 from src.loaders.settings import MongoSettings, mongo_settings
 from src.models import Tender
@@ -29,10 +29,40 @@ class MongoLoader:
         if not documents:
             return 0
         operations = [
-            ReplaceOne({"_id": doc["_id"]}, doc, upsert=True) for doc in documents
+            UpdateOne(
+                {"_id": doc["_id"]},
+                {"$set": {key: value for key, value in doc.items() if key != "_id"}},
+                upsert=True,
+            )
+            for doc in documents
         ]
         result = self.collection.bulk_write(operations, ordered=False)
-        return int(result.upserted_count + result.modified_count + result.matched_count)
+        return int(result.upserted_count + result.matched_count)
+
+    def upsert_cards(self, cards: Iterable[dict[str, Any]]) -> int:
+        documents = list(cards)
+        if not documents:
+            return 0
+        operations = []
+        for card in documents:
+            industries = list(card.get("industries") or [])
+            body = {key: value for key, value in card.items() if key != "industries"}
+            operations.append(
+                UpdateOne(
+                    {"_id": card["tender_id"]},
+                    {
+                        "$set": {
+                            "id": card["tender_id"],
+                            "url": card.get("url"),
+                            "card": body,
+                            "industries": industries,
+                        }
+                    },
+                    upsert=True,
+                )
+            )
+        result = self.collection.bulk_write(operations, ordered=False)
+        return int(result.upserted_count + result.matched_count)
 
     def find_by_id(self, tender_id: str) -> dict[str, Any] | None:
         return self.collection.find_one({"_id": tender_id})

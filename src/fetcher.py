@@ -15,9 +15,9 @@ MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 2.0
 
 
-def create_http_client() -> httpx.Client:
+def create_http_client(timeout: float = DEFAULT_TIMEOUT) -> httpx.Client:
     return httpx.Client(
-        timeout=DEFAULT_TIMEOUT,
+        timeout=timeout,
         headers={"User-Agent": DEFAULT_USER_AGENT},
         follow_redirects=True,
     )

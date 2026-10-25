@@ -1,0 +1,5 @@
+SECRET_KEY = "tender-lab-secret-key"
+SQLALCHEMY_DATABASE_URI = "sqlite:////app/superset_home/superset.db"
+PREVENT_UNSAFE_DEFAULT_URLS_ON_DATASET = False
+TALISMAN_ENABLED = False
+FEATURE_FLAGS = {"DASHBOARD_NATIVE_FILTERS": True}

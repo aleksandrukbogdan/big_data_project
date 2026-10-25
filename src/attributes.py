@@ -42,6 +42,7 @@ class TenderAttributes:
             "price_rub": self.price_rub,
             "price_raw": self.price_raw,
             "currency": self.currency,
+            "price_kind": "nmck",
             "url": self.url,
             "source": self.source,
         }

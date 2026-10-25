@@ -117,6 +117,8 @@ services:
     image: adminer:4
     ports:
       - "8082:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres-ods
     depends_on:
       - postgres-ods
     restart: always
@@ -221,8 +223,118 @@ services:
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
 
+  superset:
+    build: ./superset
+    image: lab1-superset:4.1.2
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: tender-lab-secret-key
+      SUPERSET_LOAD_EXAMPLES: "no"
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin
+      ADMIN_EMAIL: admin@localhost
+      ADMIN_FIRST_NAME: Admin
+      ADMIN_LAST_NAME: User
+    command: ["/bin/bash", "/app/docker/lab-entrypoint.sh"]
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/entrypoint.sh:/app/docker/lab-entrypoint.sh:ro
+      - superset-home:/app/superset_home
+    depends_on:
+      postgres-ods:
+        condition: service_healthy
+    restart: always
+
+  om-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: openmetadata_user
+      POSTGRES_PASSWORD: openmetadata_password
+      POSTGRES_DB: openmetadata_db
+    volumes:
+      - om-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "openmetadata_user", "-d", "openmetadata_db"]
+      interval: 10s
+      retries: 8
+      start_period: 10s
+    restart: always
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.4
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - om-es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 40s
+    restart: always
+
+  openmetadata-migrate:
+    image: docker.getcollate.io/openmetadata/server:1.6.4
+    command: ["./bootstrap/openmetadata-ops.sh", "migrate"]
+    environment: &openmetadata-env
+      OPENMETADATA_CLUSTER_NAME: openmetadata
+      SERVER_PORT: "8585"
+      SERVER_ADMIN_PORT: "8586"
+      LOG_LEVEL: INFO
+      AUTHORIZER_CLASS_NAME: org.openmetadata.service.security.DefaultAuthorizer
+      AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
+      AUTHORIZER_ADMIN_PRINCIPALS: "[admin]"
+      AUTHORIZER_INGESTION_PRINCIPALS: "[ingestion-bot]"
+      AUTHORIZER_PRINCIPAL_DOMAIN: open-metadata.org
+      AUTHENTICATION_PROVIDER: basic
+      AUTHENTICATION_PUBLIC_KEYS: "[http://localhost:8585/api/v1/system/config/jwks]"
+      AUTHENTICATION_JWT_PRINCIPAL_CLAIMS: "[email,preferred_username,sub]"
+      RSA_PUBLIC_KEY_FILE_PATH: "./conf/public_key.der"
+      RSA_PRIVATE_KEY_FILE_PATH: "./conf/private_key.der"
+      JWT_ISSUER: open-metadata.org
+      JWT_KEY_ID: Gb389a-9f76-gdjs-a92j-0242bk94356
+      DB_DRIVER_CLASS: org.postgresql.Driver
+      DB_SCHEME: postgresql
+      DB_PARAMS: allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_USER: openmetadata_user
+      DB_USER_PASSWORD: openmetadata_password
+      DB_HOST: om-postgres
+      DB_PORT: "5432"
+      OM_DATABASE: openmetadata_db
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      ELASTICSEARCH_SCHEME: http
+      SEARCH_TYPE: elasticsearch
+      SERVER_HOST_API_URL: http://openmetadata-server:8585/api
+      PIPELINE_SERVICE_CLIENT_VERIFY_SSL: "no-ssl"
+      OPENMETADATA_HEAP_OPTS: "-Xmx768m -Xms512m"
+    depends_on:
+      om-postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
+  openmetadata-server:
+    image: docker.getcollate.io/openmetadata/server:1.6.4
+    ports:
+      - "8585:8585"
+    environment:
+      <<: *openmetadata-env
+    depends_on:
+      openmetadata-migrate:
+        condition: service_completed_successfully
+    restart: always
+
 volumes:
   postgres-airflow-data:
   postgres-ods-data:
   mongo-ods-data:
   minio-ods-data:
+  superset-home:
+  om-postgres-data:
+  om-es-data:

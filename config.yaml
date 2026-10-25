@@ -13,3 +13,5 @@ interval_minutes: 10
 storage_path: data/seen.db
 output_path: output/matches.jsonl
 use_category_fallback: true
+detail_fetch_limit: 40
+detail_delay_seconds: 0.4

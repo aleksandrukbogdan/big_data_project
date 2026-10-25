@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from src.card import fetch_tender_cards
 from src.etl import (
     attributes_from_tenders,
     fetch_raw_sources,
@@ -82,22 +83,54 @@ def load_tenders_to_mongo(records: list[dict[str, Any]]) -> dict[str, Any]:
 def transform_geo_prices(payloads: dict[str, str]) -> dict[str, list[dict[str, Any]]]:
     tenders = parse_tenders_from_raw(payloads)
     attrs = attributes_from_tenders(tenders)
+    config = _config()
+    cards = fetch_tender_cards(
+        tenders,
+        limit=config.detail_fetch_limit,
+        delay_seconds=config.detail_delay_seconds,
+    )
+    cards_by_id = {card.tender_id: card for card in cards}
+    prices: list[dict[str, Any]] = []
+    for item in attrs:
+        record = item.price_record()
+        card = cards_by_id.get(item.tender_id)
+        if card is not None and card.nmck_raw:
+            record["price_rub"] = card.nmck_rub
+            record["price_raw"] = card.nmck_raw
+        record["price_kind"] = "nmck"
+        prices.append(record)
+    card_records = [card.to_record() for card in cards]
     return {
         "locations": [item.location_record() for item in attrs],
-        "prices": [item.price_record() for item in attrs],
+        "prices": prices,
+        "cards": card_records,
+        "industries": [
+            {"tender_id": card.tender_id, "industry": industry}
+            for card in cards
+            for industry in card.industries
+        ],
     }
 
 
 def load_geo_prices_to_postgres(payload: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+    cards = payload.get("cards") or []
     with PostgresLoader() as loader:
         loader.ensure_schema()
         n_loc, n_price = loader.upsert_records(payload["locations"], payload["prices"])
-        return {
+        n_cards = loader.upsert_cards(cards)
+        result = {
             "locations": n_loc,
             "prices": n_price,
+            "cards": n_cards,
             "location_rows": loader.count_locations(),
             "price_rows": loader.count_prices(),
         }
+    if cards:
+        with MongoLoader() as mongo:
+            result["mongo_cards"] = mongo.upsert_cards(cards)
+    else:
+        result["mongo_cards"] = 0
+    return result
 
 
 def _parse_iso(value: str | None):

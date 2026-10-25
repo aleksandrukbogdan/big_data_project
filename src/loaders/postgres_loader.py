@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime
+from pathlib import Path
 from typing import Iterable
 
 import psycopg2
@@ -24,15 +26,37 @@ ON CONFLICT (tender_id) DO UPDATE SET
 
 UPSERT_PRICES = """
 INSERT INTO ods.tender_prices (
-    tender_id, price_rub, price_raw, currency, url, source, loaded_at
+    tender_id, price_rub, price_raw, currency, price_kind, url, source, loaded_at
 )
 VALUES %s
 ON CONFLICT (tender_id) DO UPDATE SET
     price_rub = EXCLUDED.price_rub,
     price_raw = EXCLUDED.price_raw,
     currency = EXCLUDED.currency,
+    price_kind = EXCLUDED.price_kind,
     url = EXCLUDED.url,
     source = EXCLUDED.source,
+    loaded_at = NOW()
+"""
+
+UPSERT_CARDS = """
+INSERT INTO ods.tender_cards (
+    tender_id, url, status, procedure_group, procedure_name,
+    nmck_rub, nmck_raw, price_kind,
+    application_start, application_end, contract_date, loaded_at
+)
+VALUES %s
+ON CONFLICT (tender_id) DO UPDATE SET
+    url = EXCLUDED.url,
+    status = EXCLUDED.status,
+    procedure_group = EXCLUDED.procedure_group,
+    procedure_name = EXCLUDED.procedure_name,
+    nmck_rub = EXCLUDED.nmck_rub,
+    nmck_raw = EXCLUDED.nmck_raw,
+    price_kind = EXCLUDED.price_kind,
+    application_start = EXCLUDED.application_start,
+    application_end = EXCLUDED.application_end,
+    contract_date = EXCLUDED.contract_date,
     loaded_at = NOW()
 """
 
@@ -90,6 +114,7 @@ class PostgresLoader:
                 price.get("price_rub"),
                 price.get("price_raw"),
                 price.get("currency") or "RUB",
+                price.get("price_kind") or "nmck",
                 price.get("url"),
                 price.get("source"),
             )
@@ -108,10 +133,59 @@ class PostgresLoader:
                     cur,
                     UPSERT_PRICES,
                     price_rows,
-                    template="(%s, %s, %s, %s, %s, %s, NOW())",
+                    template="(%s, %s, %s, %s, %s, %s, %s, NOW())",
                 )
         self.conn.commit()
         return len(location_rows), len(price_rows)
+
+    def upsert_cards(self, cards: list[dict]) -> int:
+        if not cards:
+            return 0
+        rows = [
+            (
+                card["tender_id"],
+                card.get("url"),
+                card.get("status"),
+                card.get("procedure_group"),
+                card.get("procedure_name"),
+                card.get("nmck_rub"),
+                card.get("nmck_raw"),
+                card.get("price_kind") or "nmck",
+                _as_datetime(card.get("application_start")),
+                _as_datetime(card.get("application_end")),
+                _as_date(card.get("contract_date")),
+            )
+            for card in cards
+        ]
+        tender_ids = [card["tender_id"] for card in cards]
+        industry_rows = [
+            (card["tender_id"], industry)
+            for card in cards
+            for industry in (card.get("industries") or [])
+        ]
+        with self.conn.cursor() as cur:
+            execute_values(
+                cur,
+                UPSERT_CARDS,
+                rows,
+                template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())",
+            )
+            cur.execute(
+                "DELETE FROM ods.tender_industries WHERE tender_id = ANY(%s)",
+                (tender_ids,),
+            )
+            if industry_rows:
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO ods.tender_industries (tender_id, industry)
+                    VALUES %s
+                    ON CONFLICT (tender_id, industry) DO NOTHING
+                    """,
+                    industry_rows,
+                )
+        self.conn.commit()
+        return len(rows)
 
     def fetch_location(self, tender_id: str) -> tuple | None:
         with self.conn.cursor() as cur:
@@ -138,34 +212,31 @@ class PostgresLoader:
                 SELECT
                     pg_total_relation_size('ods.tender_locations')
                     + pg_total_relation_size('ods.tender_prices')
+                    + pg_total_relation_size('ods.tender_cards')
+                    + pg_total_relation_size('ods.tender_industries')
                 """
             )
             return int(cur.fetchone()[0])
 
 
+def _as_datetime(value: datetime | str | None) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value)
+
+
+def _as_date(value: date | datetime | str | None) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value)[:10])
+
+
 def _default_ddl() -> str:
-    return """
-    CREATE SCHEMA IF NOT EXISTS ods;
-
-    CREATE TABLE IF NOT EXISTS ods.tender_locations (
-        id SERIAL PRIMARY KEY,
-        tender_id TEXT NOT NULL UNIQUE,
-        city TEXT,
-        region TEXT,
-        location_raw TEXT,
-        url TEXT,
-        source TEXT,
-        loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS ods.tender_prices (
-        id SERIAL PRIMARY KEY,
-        tender_id TEXT NOT NULL UNIQUE,
-        price_rub NUMERIC(18, 2),
-        price_raw TEXT,
-        currency TEXT NOT NULL DEFAULT 'RUB',
-        url TEXT,
-        source TEXT,
-        loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    """
+    sql_path = Path(__file__).resolve().parents[2] / "sql" / "init_ods.sql"
+    return sql_path.read_text(encoding="utf-8")

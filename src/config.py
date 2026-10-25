@@ -17,6 +17,8 @@ class Config:
         storage_path: Path,
         output_path: Path,
         use_category_fallback: bool,
+        detail_fetch_limit: int = 40,
+        detail_delay_seconds: float = 0.4,
     ) -> None:
         self.rss_url = rss_url
         self.category_url = category_url
@@ -25,6 +27,8 @@ class Config:
         self.storage_path = storage_path
         self.output_path = output_path
         self.use_category_fallback = use_category_fallback
+        self.detail_fetch_limit = detail_fetch_limit
+        self.detail_delay_seconds = detail_delay_seconds
 
     @property
     def interval_seconds(self) -> int:
@@ -49,6 +53,8 @@ def load_config(path: Path | None = None) -> Config:
         storage_path=Path(raw.get("storage_path", "data/seen.db")),
         output_path=Path(raw.get("output_path", "output/matches.jsonl")),
         use_category_fallback=bool(raw.get("use_category_fallback", True)),
+        detail_fetch_limit=int(raw.get("detail_fetch_limit", 40)),
+        detail_delay_seconds=float(raw.get("detail_delay_seconds", 0.4)),
     )
 
 
