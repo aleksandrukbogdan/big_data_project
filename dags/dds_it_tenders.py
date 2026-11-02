@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.datasets import Dataset
 from airflow.operators.python import PythonOperator
 from airflow.sensors.python import PythonSensor
-
-from src.dds_load import (
-    apply_scd,
-    clean_stage,
-    conform_dimensions,
-    load_aggregates,
-    load_facts,
-)
+from src.dds_load import apply_scd
+from src.dds_load import clean_stage
+from src.dds_load import conform_dimensions
+from src.dds_load import load_aggregates
+from src.dds_load import load_facts
 
 ODS_IT_TENDERS = Dataset("postgres://postgres-ods:5432/ods/ods/tender_cards")
 DDS_IT_TENDERS = Dataset("postgres://postgres-ods:5432/ods/dds/fact_tender")

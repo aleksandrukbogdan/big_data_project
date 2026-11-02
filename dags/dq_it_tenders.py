@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.datasets import Dataset
 from airflow.operators.python import PythonOperator
 from airflow.sensors.python import PythonSensor
-
 from src.dq_load import run_dq
 
 DDS_IT_TENDERS = Dataset("postgres://postgres-ods:5432/ods/dds/fact_tender")

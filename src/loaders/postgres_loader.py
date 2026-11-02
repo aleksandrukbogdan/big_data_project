@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from collections.abc import Iterable
+from datetime import date
+from datetime import datetime
 from pathlib import Path
-from typing import Iterable
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -158,11 +159,7 @@ class PostgresLoader:
             for card in cards
         ]
         tender_ids = [card["tender_id"] for card in cards]
-        industry_rows = [
-            (card["tender_id"], industry)
-            for card in cards
-            for industry in (card.get("industries") or [])
-        ]
+        industry_rows = [(card["tender_id"], industry) for card in cards for industry in (card.get("industries") or [])]
         with self.conn.cursor() as cur:
             execute_values(
                 cur,

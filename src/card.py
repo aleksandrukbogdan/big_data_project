@@ -4,7 +4,10 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from html import unescape
 
 from bs4 import BeautifulSoup
@@ -112,11 +115,7 @@ def parse_tender_card(html: str, *, tender_id: str, url: str) -> TenderCard:
     nmck_raw = " ".join(price_lines).strip() or None
     nmck_rub = _money(nmck_raw) if nmck_raw else None
 
-    procedure_lines = [
-        line
-        for line in _section(lines, "Способ размещения")
-        if not _skip_value(line)
-    ]
+    procedure_lines = [line for line in _section(lines, "Способ размещения") if not _skip_value(line)]
     procedure_group = procedure_lines[0] if procedure_lines else None
     procedure_name = procedure_lines[1] if len(procedure_lines) > 1 else None
 

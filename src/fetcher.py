@@ -7,9 +7,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_USER_AGENT = (
-    "Mozilla/5.0 (compatible; TenderScreening/0.1; +https://github.com/local/tender-screening)"
-)
+DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; TenderScreening/0.1; +https://github.com/local/tender-screening)"
 DEFAULT_TIMEOUT = 30.0
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 2.0

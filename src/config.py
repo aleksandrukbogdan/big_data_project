@@ -4,7 +4,8 @@ from pathlib import Path
 
 import yaml
 
-from src.fetcher import create_http_client, fetch_url
+from src.fetcher import create_http_client
+from src.fetcher import fetch_url
 
 
 class Config:
@@ -45,9 +46,7 @@ def load_config(path: Path | None = None) -> Config:
 
     return Config(
         rss_url=raw["rss_url"],
-        category_url=raw.get(
-            "category_url", "https://rostender.info/category/tendery-v-oblasti-it"
-        ),
+        category_url=raw.get("category_url", "https://rostender.info/category/tendery-v-oblasti-it"),
         keywords=[str(k) for k in raw.get("keywords", [])],
         interval_minutes=int(raw.get("interval_minutes", 10)),
         storage_path=Path(raw.get("storage_path", "data/seen.db")),

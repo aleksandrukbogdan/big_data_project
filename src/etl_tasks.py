@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from typing import Any
 
 from src.card import fetch_tender_cards
-from src.etl import (
-    attributes_from_tenders,
-    fetch_raw_sources,
-    load_etl_config,
-    parse_tenders_from_raw,
-)
-from src.loaders.minio_loader import MinioLoader, raw_object_prefix
+from src.etl import attributes_from_tenders
+from src.etl import fetch_raw_sources
+from src.etl import load_etl_config
+from src.etl import parse_tenders_from_raw
+from src.loaders.minio_loader import MinioLoader
+from src.loaders.minio_loader import raw_object_prefix
 from src.loaders.mongo_loader import MongoLoader
 from src.loaders.postgres_loader import PostgresLoader
 from src.models import Tender
@@ -28,8 +28,7 @@ def transform_raw_metadata(payloads: dict[str, str]) -> dict[str, Any]:
     return {
         "fetched_at": datetime.now(timezone.utc).isoformat(),
         "files": {
-            name: {"bytes": len(content.encode("utf-8")), "chars": len(content)}
-            for name, content in payloads.items()
+            name: {"bytes": len(content.encode("utf-8")), "chars": len(content)} for name, content in payloads.items()
         },
     }
 
@@ -105,9 +104,7 @@ def transform_geo_prices(payloads: dict[str, str]) -> dict[str, list[dict[str, A
         "prices": prices,
         "cards": card_records,
         "industries": [
-            {"tender_id": card.tender_id, "industry": industry}
-            for card in cards
-            for industry in card.industries
+            {"tender_id": card.tender_id, "industry": industry} for card in cards for industry in card.industries
         ],
     }
 

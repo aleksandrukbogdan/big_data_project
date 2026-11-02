@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from io import BytesIO
 
 from minio import Minio
 from minio.commonconfig import ENABLED
 from minio.versioningconfig import VersioningConfig
 
-from src.loaders.settings import MinioSettings, minio_settings
+from src.loaders.settings import MinioSettings
+from src.loaders.settings import minio_settings
 
 
 class MinioLoader:

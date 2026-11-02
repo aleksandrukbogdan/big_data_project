@@ -5,12 +5,16 @@ from pathlib import Path
 
 import httpx
 
-from src.attributes import TenderAttributes, extract_attributes_many
+from src.attributes import TenderAttributes
+from src.attributes import extract_attributes_many
 from src.category_parser import parse_category_page
-from src.config import Config, load_config
-from src.fetcher import create_http_client, fetch_url
+from src.config import Config
+from src.config import load_config
+from src.fetcher import create_http_client
+from src.fetcher import fetch_url
 from src.models import Tender
-from src.rss_parser import deduplicate_tenders, parse_rss
+from src.rss_parser import deduplicate_tenders
+from src.rss_parser import parse_rss
 
 
 def load_etl_config(path: str | Path | None = None) -> Config:

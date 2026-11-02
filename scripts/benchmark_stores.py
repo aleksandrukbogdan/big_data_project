@@ -5,7 +5,8 @@ import json
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from html import escape
 from pathlib import Path
 from statistics import mean
@@ -15,9 +16,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import matplotlib.pyplot as plt
-
-from src.etl import attributes_from_tenders, fetch_raw_sources, load_etl_config, parse_tenders_from_raw
-from src.loaders.minio_loader import MinioLoader, raw_object_prefix
+from src.etl import attributes_from_tenders
+from src.etl import fetch_raw_sources
+from src.etl import load_etl_config
+from src.etl import parse_tenders_from_raw
+from src.loaders.minio_loader import MinioLoader
+from src.loaders.minio_loader import raw_object_prefix
 from src.loaders.mongo_loader import MongoLoader
 from src.loaders.postgres_loader import PostgresLoader
 from src.models import Tender
@@ -101,7 +105,9 @@ def load_from_minio() -> tuple[dict[str, str], list[Tender], float, str]:
     return payloads, tenders, 0.0, "последний успешный запуск Airflow, файлы уже лежат в MinIO"
 
 
-def load_batch(config_path: Path | None, *, snapshot_only: bool = False, from_minio: bool = False) -> tuple[dict[str, str], list[Tender], float, str]:
+def load_batch(
+    config_path: Path | None, *, snapshot_only: bool = False, from_minio: bool = False
+) -> tuple[dict[str, str], list[Tender], float, str]:
     snapshot = ROOT / "output" / "matches.jsonl"
     if from_minio:
         return load_from_minio()
@@ -136,11 +142,7 @@ def benchmark(config_path: Path | None = None, *, snapshot_only: bool = False, f
 
     def write_minio():
         for name, content in payloads.items():
-            content_type = (
-                "application/xml; charset=utf-8"
-                if name.endswith(".xml")
-                else "text/html; charset=utf-8"
-            )
+            content_type = "application/xml; charset=utf-8" if name.endswith(".xml") else "text/html; charset=utf-8"
             minio.put_text(f"{prefix}{name}", content, content_type)
 
     _, minio_write_ms = _timed(write_minio)

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from datetime import datetime
 from email.utils import parsedate_to_datetime
-from typing import Iterable
 
 import feedparser
 

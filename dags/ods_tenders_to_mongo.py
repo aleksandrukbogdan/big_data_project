@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
-from src.etl_tasks import extract_raw, load_tenders_to_mongo, transform_tenders
+from src.etl_tasks import extract_raw
+from src.etl_tasks import load_tenders_to_mongo
+from src.etl_tasks import transform_tenders
 
 DEFAULT_ARGS = {
     "owner": "tender_screening",

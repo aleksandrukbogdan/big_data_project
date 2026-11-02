@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Iterable
+from collections.abc import Iterable
+from datetime import datetime
+from datetime import timezone
+from typing import Any
 
-from pymongo import MongoClient, UpdateOne
+from pymongo import MongoClient
+from pymongo import UpdateOne
 
-from src.loaders.settings import MongoSettings, mongo_settings
+from src.loaders.settings import MongoSettings
+from src.loaders.settings import mongo_settings
 from src.models import Tender
 
 

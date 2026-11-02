@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from airflow import DAG
 from airflow.datasets import Dataset
@@ -8,7 +9,9 @@ from airflow.operators.python import PythonOperator
 
 ODS_IT_TENDERS = Dataset("postgres://postgres-ods:5432/ods/ods/tender_cards")
 
-from src.etl_tasks import extract_raw, load_geo_prices_to_postgres, transform_geo_prices
+from src.etl_tasks import extract_raw
+from src.etl_tasks import load_geo_prices_to_postgres
+from src.etl_tasks import transform_geo_prices
 
 DEFAULT_ARGS = {
     "owner": "tender_screening",

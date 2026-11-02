@@ -5,7 +5,8 @@ from typing import Any
 
 import psycopg2
 
-from src.geo_titles import CITY_TITLES, REGION_TITLES
+from src.geo_titles import CITY_TITLES
+from src.geo_titles import REGION_TITLES
 from src.loaders.settings import postgres_dsn
 
 DDL_PATH = Path(__file__).resolve().parents[1] / "sql" / "init_dds.sql"

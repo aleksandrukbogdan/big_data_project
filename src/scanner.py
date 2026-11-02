@@ -8,10 +8,12 @@ import httpx
 
 from src.category_parser import parse_category_page
 from src.config import Config
-from src.fetcher import create_http_client, fetch_url
+from src.fetcher import create_http_client
+from src.fetcher import fetch_url
 from src.filter import filter_tenders
 from src.models import Tender
-from src.rss_parser import deduplicate_tenders, parse_rss
+from src.rss_parser import deduplicate_tenders
+from src.rss_parser import parse_rss
 from src.storage import SeenStorage
 
 logger = logging.getLogger(__name__)
